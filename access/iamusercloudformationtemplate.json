@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  this template will create an IAM policy that will grand permissions to list EC2 instances and modify EBS volume; create an IAM user and attach the created policy to the Iam user and store the credentials securely Secrets Manager
+
+Resources:
+  IAMUserModifyVolume:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: iamusermodifyvolume
+      Path: "/"
+
+  EC2ListAndModifyVolumesPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: ec2listandmodifyvolumespermission
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: EC2ReadOnlyAccess
+            Effect: Allow
+            Action:
+              - ec2:DescribeInstances
+              - ec2:DescribeInstanceStatus
+            Resource: "*"
+          - Sid: EBSDescribeAndModify
+            Effect: Allow
+            Action:
+              - ec2:DescribeVolumes
+              - ec2:DescribeVolumeStatus
+              - ec2:ModifyVolume
+              - ec2:ModifyVolumeAttribute
+            Resource: "*"
+      Users:
+        - !Ref IAMUserModifyVolume
+
+  IAMAccessKeyModifyVolume:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref IAMUserModifyVolume
+
+  IAMUserSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: iamusermodifyvolume-credentials
+      Description: "Stores IAM user credentials for iamusermodifyvolume"
+      SecretString: !Sub |
+        {
+          "AccessKeyId": "${IAMAccessKeyModifyVolume}",
+          "SecretAccessKey": "${IAMAccessKeyModifyVolume.SecretAccessKey}"
+        }
+
+Outputs:
+  IAMUserName:
+    Description: Name of the IAM user created.
+    Value: !Ref IAMUserModifyVolume
+
+  SecretArn:
+    Description: ARN of the secret storing IAM credentials in Secrets Manager.
+    Value: !Ref IAMUserSecret
