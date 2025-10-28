@@ -1,12 +1,24 @@
 # ansibleebsautomation
 
-This repo guides in deploying a solution on Ansible using Dynamic Inventory the collects information of all the public IP EC2 instances across all the regions. Modifying `ansible_host: public_ip_address` to `ansible_host: public_ip_address` will enable host to ssh EC2 instance using private IP however, it will only work if the instances are accessible using private IP. 
-The solution uses Ansible Vault to securly store IAM credentails and detects the low disk utilization and send alerts using Amazon SNS. 
+This repository provides a guide to deploying a solution on Ansible using a Dynamic Inventory that collects information about all EC2 instances with public IPs across all AWS regions.
 
-## Key highlights of the solution
-1. Utilizing existing configuration management tool - Ansible.
-2. Securely stores IAM credentials and uses fine-grained access control to provide the least required access.
-3. Utilize AWS APIs.
-4. Gathers Amazon EBS volume data from all the Amazon EC2 instances.
-5. Scalable solution as it can manage resources across regions and AWS accounts.
-6. Proactively increase the volume size by 10% if no action is taken 1 hour after the alert.
+Modifying the configuration from
+`ansible_host: public_ip_address` to `ansible_host: private_ip_address`
+will enable the host to SSH into EC2 instances using their private IPs. However, this will only work if the Ansible control node can access those instances over private IP (for example, if it’s in the same VPC).
+
+The solution uses Ansible Vault to securely store IAM credentials and continuously monitors disk utilization on EC2 instances. If the usage exceeds a defined threshold (e.g., 85%), it sends alerts using Amazon SNS.
+
+**At a high level**, this solution leverages a CloudFormation template to create an AWS programmatic user with permissions to list EC2 instances (for inventory management) and publish messages to an SNS topic. The CloudFormation stack also creates the SNS topic and subscription.
+
+The Ansible configuration securely stores credentials using Ansible Vault, connects to EC2 instances using public IPs (configurable for private IPs), monitors disk utilization every hour, and sends alerts via SNS if the threshold is crossed.
+
+---
+
+## Schedule the playbook to run every hour
+
+```bash
+crontab -e
+```
+```bash
+0 * * * * /usr/bin/ansible-playbook -i ./aws_ec2.yml ./disk_monitor.yml -u ec2-user --key-file ./mykey.pem >> /var/log/ansible_disk_monitor.log 2>&1
+```
