@@ -1,0 +1,40 @@
+- name: Monitor EBS disk usage and send SNS alerts if above threshold
+  hosts: all
+  gather_facts: yes
+  become: yes
+
+  vars:
+    sns_topic_arn: "arn:aws:sns:us-east-1:xxxxxxxx:EBSalerts"  # Change this, a single SNS topic can cater EC2 instances across all regions
+    threshold: 85
+    aws_region: "us-east-1"
+
+  tasks:
+    - name: Get all EBS disk usage
+      ansible.builtin.shell: |
+        df -hPT | awk '$2 ~ /xfs|ext4/ {print $7 " " $6}' | sed 's/%//'
+      register: disk_info
+      changed_when: false
+
+    - name: Parse disk usage output
+      ansible.builtin.set_fact:
+        disks: "{{ disk_info.stdout_lines | map('split', ' ') | list }}"
+
+    - name: Display disk usage for each mount point
+      ansible.builtin.debug:
+        msg: "Host {{ inventory_hostname }} → Mount {{ item.0 }} has {{ item.1 }}% used"
+      loop: "{{ disks }}"
+
+    - name: Send SNS alert for disks above threshold
+      amazon.aws.sns:
+        msg: |
+          ALERT: Disk usage on instance {{ inventory_hostname }} exceeded {{ threshold }}%
+          Region: {{ ansible_ec2_placement_region }}
+          Private IP: {{ ansible_host }}
+          High usage disks:
+          {% for disk in disks if (disk[1] | int) > threshold %}
+            - Mount: {{ disk[0] }}, Usage: {{ disk[1] }}%
+          {% endfor %}
+        subject: "High Disk Usage Alert: {{ inventory_hostname }}"
+        topic_arn: "{{ sns_topic_arn }}"
+        region: "{{ aws_region }}"
+      when: disks | selectattr('1', 'int', '>', threshold) | list | length > 0
