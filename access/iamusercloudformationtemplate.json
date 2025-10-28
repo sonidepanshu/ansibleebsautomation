@@ -1,86 +1,99 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  this template will create an IAM policy that will grand permissions to list EC2 instances, list EBS volumes, modify EBS volume and send alerts; create an IAM user and attach the created policy to the Iam user and store the credentials securely Secrets Manager. This template will also create an SNS topic and subscription for alerting. 
+  Creates an IAM programmatic user for Ansible  with permissions to list EC2 instances across all regions,
+  create and publish to an SNS topic, and stores the credentials in Secrets Manager.
 
-AWSTemplateFormatVersion: "2010-09-09"
-Description: >
-  Secure CloudFormation template to create IAM User, IAM Policy, generate access keys,
-  store them securely in AWS Secrets Manager, and set up SNS alerts.
+Parameters:
+  SubscriptionEmail:
+    Type: String
+    Description: "Enter the email address to subscribe to the SNS topic."
 
 Resources:
-  IAMUserModifyVolume:
-    Type: AWS::IAM::User
-    Properties:
-      UserName: iamusermodifyvolume
-      Path: "/"
-
   EBSSNSTopic:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: EBSalerts
-      DisplayName: EBSalerts
+      DisplayName: "EBS Disk Alerts Topic"
 
   EBSSNSTopicSubscription:
     Type: AWS::SNS::Subscription
     Properties:
       Protocol: email
-      Endpoint: ansiblealerts@deepanshu.com
+      Endpoint: !Ref SubscriptionEmail
       TopicArn: !Ref EBSSNSTopic
 
-  EC2ListAndModifyVolumesPolicy:
+  AnsiblePolicy:
     Type: AWS::IAM::Policy
     Properties:
-      PolicyName: ec2listandmodifyvolumespermission
+      PolicyName: AnsibleEC2ReadSNSPublishPolicy
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Sid: EC2ReadOnlyAccess
+          - Sid: EC2ReadOnly
             Effect: Allow
             Action:
               - ec2:DescribeInstances
-              - ec2:DescribeInstanceStatus
-            Resource: "*"
-          - Sid: EBSDescribeAndModify
-            Effect: Allow
-            Action:
+              - ec2:DescribeRegions
+              - ec2:DescribeTags
               - ec2:DescribeVolumes
-              - ec2:DescribeVolumeStatus
-              - ec2:ModifyVolume
-              - ec2:ModifyVolumeAttribute
+              - ec2:DescribeSnapshots
             Resource: "*"
-          - Sid: SNSSendAlerts
+
+          - Sid: SNSAccess
             Effect: Allow
             Action:
               - sns:Publish
+              - sns:ListTopics
+              - sns:GetTopicAttributes
             Resource: !Ref EBSSNSTopic
-      Users:
-        - !Ref IAMUserModifyVolume
 
-  IAMAccessKeyModifyVolume:
+      Users:
+        - !Ref AnsibleUser
+
+  AnsibleUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: AnsibleAutomationUser
+      Policies: []
+      Tags:
+        - Key: Purpose
+          Value: Ansible Dynamic Inventory
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AnsibleUserAccessKey:
     Type: AWS::IAM::AccessKey
     Properties:
-      UserName: !Ref IAMUserModifyVolume
+      UserName: !Ref AnsibleUser
 
-  IAMUserSecret:
+  AnsibleCredentialsSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Name: iamusermodifyvolume-credentials
-      Description: "Stores IAM user credentials for iamusermodifyvolume"
+      Name: AnsibleAutomationUserCredentials
+      Description: "Stores IAM programmatic access keys for Ansible automation."
       SecretString: !Sub |
         {
-          "AccessKeyId": "${IAMAccessKeyModifyVolume}",
-          "SecretAccessKey": "${IAMAccessKeyModifyVolume.SecretAccessKey}"
+          "aws_access_key": "${AnsibleUserAccessKey}",
+          "aws_secret_key": "${AnsibleUserAccessKey.SecretAccessKey}"
         }
 
 Outputs:
   IAMUserName:
-    Description: Name of the IAM user created.
-    Value: !Ref IAMUserModifyVolume
+    Description: "IAM User created for Ansible automation"
+    Value: !Ref AnsibleUser
 
-  SecretArn:
-    Description: ARN of the secret storing IAM credentials in Secrets Manager.
-    Value: !Ref IAMUserSecret
+  AccessKeyID:
+    Description: "Access Key ID for Ansible IAM User"
+    Value: !Ref AnsibleUserAccessKey
 
-  SNSTopicArn:
-    Description: ARN of the SNS Topic created for EBS alerts.
+  SecretManagerARN:
+    Description: "ARN of the secret storing IAM credentials"
+    Value: !Ref AnsibleCredentialsSecret
+
+  SNSTopicARN:
+    Description: "ARN of the SNS Topic created for EBS alerts"
     Value: !Ref EBSSNSTopic
+
+  SNSSubscription:
+    Description: "Email subscription created for the SNS topic. Confirm the email to start receiving alerts."
+    Value: !Ref EBSSNSTopicSubscription
