@@ -1,6 +1,11 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  this template will create an IAM policy that will grand permissions to list EC2 instances and modify EBS volume; create an IAM user and attach the created policy to the Iam user and store the credentials securely Secrets Manager
+  this template will create an IAM policy that will grand permissions to list EC2 instances, list EBS volumes, modify EBS volume and send alerts; create an IAM user and attach the created policy to the Iam user and store the credentials securely Secrets Manager. This template will also create an SNS topic and subscription for alerting. 
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Secure CloudFormation template to create IAM User, IAM Policy, generate access keys,
+  store them securely in AWS Secrets Manager, and set up SNS alerts.
 
 Resources:
   IAMUserModifyVolume:
@@ -8,6 +13,19 @@ Resources:
     Properties:
       UserName: iamusermodifyvolume
       Path: "/"
+
+  EBSSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: EBSalerts
+      DisplayName: EBSalerts
+
+  EBSSNSTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: ansiblealerts@deepanshu.com
+      TopicArn: !Ref EBSSNSTopic
 
   EC2ListAndModifyVolumesPolicy:
     Type: AWS::IAM::Policy
@@ -30,6 +48,11 @@ Resources:
               - ec2:ModifyVolume
               - ec2:ModifyVolumeAttribute
             Resource: "*"
+          - Sid: SNSSendAlerts
+            Effect: Allow
+            Action:
+              - sns:Publish
+            Resource: !Ref EBSSNSTopic
       Users:
         - !Ref IAMUserModifyVolume
 
@@ -57,3 +80,7 @@ Outputs:
   SecretArn:
     Description: ARN of the secret storing IAM credentials in Secrets Manager.
     Value: !Ref IAMUserSecret
+
+  SNSTopicArn:
+    Description: ARN of the SNS Topic created for EBS alerts.
+    Value: !Ref EBSSNSTopic
