@@ -11,8 +11,9 @@ After the stack is created, login to your email account `ansiblealerts@deepanshu
 After the stack is created, open the AWS Secrets Manager Console and retrieve the credentials "iamusermodifyvolume-credentials" — this will contain the AccessKeyId and SecretAccessKey.
 
 ### Step 4:
-On the Ansible control node, create a Vault file to store the AWS credentials by running the command below:
+On the Ansible control node, install Amazon AWS Collection[+](https://galaxy.ansible.com/ui/repo/published/amazon/aws/) and create a Vault file to store the AWS credentials by running the command below:
 ```bash
+ansible-galaxy collection install amazon.aws
 ansible-vault create ~/.aws/ansible_aws_credentials.yml
 ```
 The command will prompt you to set a password.
