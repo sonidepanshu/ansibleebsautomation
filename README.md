@@ -1,6 +1,7 @@
 # ansibleebsautomation
 
-This repo guides in deploying a solution on Ansible to securely monitor all the Amazon EBS volumes attached on all the Amazon EC2 instances. the solution detects low disk space utilization, send alerts, and increase the volume size proactively.
+This repo guides in deploying a solution on Ansible using Dynamic Inventory the collects information of all the public IP EC2 instances across all the regions. Modifying `ansible_host: public_ip_address` to `ansible_host: public_ip_address` will enable host to ssh EC2 instance using private IP however, it will only work if the instances are accessible using private IP. 
+The solution uses Ansible Vault to securly store IAM credentails and detects the low disk utilization and send alerts using Amazon SNS. 
 
 ## Key highlights of the solution
 1. Utilizing existing configuration management tool - Ansible.
